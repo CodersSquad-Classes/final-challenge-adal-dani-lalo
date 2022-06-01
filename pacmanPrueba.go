@@ -144,6 +144,18 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		//prevGhostPosX = ghost.posX
 		//prevGhostPosY = ghost.posY
 	}
+
+	//drawn points
+	opPoint := &ebiten.DrawImageOptions{}
+	pointH := spriteSize / pointSize //CAMBIAR NOMBRE VARIABLE
+	pointW := spriteSize / pointSize //CAMBIAR NOMBRE VARIABLE
+
+	for _, point := range g.points {
+		opPoint.GeoM.Scale(pointW, pointH)
+		opPoint.GeoM.Translate(point.posX, point.posY)
+		screen.DrawImage(g.pointSprite, opPoint)
+		opPoint.GeoM.Reset()
+	}
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
@@ -213,6 +225,11 @@ func (g *Game) readMaze(fileName string) {
 				ghostPosY := float64(i * spriteSize)
 
 				g.ghosts = append(g.ghosts, &coord{ghostPosX, ghostPosY})
+			case ".":
+				pointPosX := float64(j * spriteSize)
+				pointPosY := float64(i * spriteSize)
+
+				g.points = append(g.points, &coord{pointPosX, pointPosY})
 			}
 		}
 	}
