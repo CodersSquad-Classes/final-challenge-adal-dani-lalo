@@ -21,6 +21,7 @@ const wallWidth float64 = 300
 const wallHeight float64 = 300
 const ghostWidth float64 = 209
 const ghostHeight float64 = 152
+const pointSize float64 = 100
 
 const spriteSize = 20
 const spriteSizeSmaller = 15
@@ -39,6 +40,8 @@ type Game struct {
 	playerDir    string
 	ghosts       []*coord
 	ghostSprite  *ebiten.Image
+	points       []*coord
+	pointSprite  *ebiten.Image
 }
 
 func (g *Game) Update() error {
@@ -148,17 +151,20 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
 }
 
 func main() {
-	playerImg, _, err := ebitenutil.NewImageFromFile("pacman.png")
+	playerImg, _, err := ebitenutil.NewImageFromFile("assets/pacman.png")
 	checkError(err, "Load player image error")
-	wallImg, _, err := ebitenutil.NewImageFromFile("wall.png")
+	wallImg, _, err := ebitenutil.NewImageFromFile("assets/wall.png")
 	checkError(err, "Load wall image error")
-	ghostImg, _, err := ebitenutil.NewImageFromFile("Alien1.png")
+	ghostImg, _, err := ebitenutil.NewImageFromFile("assets/Alien1.png")
 	checkError(err, "Load ghost image error")
+	pointImg, _, err := ebitenutil.NewImageFromFile("assets/punto.png")
+	checkError(err, "Load point image error")
 
 	g := &Game{}
 	g.wallSprite = wallImg
 	g.playerSprite = playerImg
 	g.ghostSprite = ghostImg
+	g.pointSprite = pointImg
 
 	g.readMaze("Maze.txt")
 
