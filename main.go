@@ -26,7 +26,7 @@ var score int
 var numDots int
 var lives = 1
 
-func main() {
+func main2() {
 	// initialise game
 	initialise()
 	defer cleanup()
@@ -65,7 +65,7 @@ func main() {
 			movePlayer(inp)
 		default:
 		}
-		moveGhosts()
+		moveGhosts2()
 
 		// process collisions
 		for _, g := range ghosts {
@@ -194,7 +194,7 @@ func readInput() (string, error) {
 	return "", nil
 }
 
-func makeMove(oldRow, oldCol int, dir string) (newRow, newCol int) {
+func makeMove2(oldRow, oldCol int, dir string) (newRow, newCol int) {
 	newRow, newCol = oldRow, oldCol
 
 	switch dir {
@@ -229,7 +229,7 @@ func makeMove(oldRow, oldCol int, dir string) (newRow, newCol int) {
 }
 
 func movePlayer(dir string) {
-	player.row, player.col = makeMove(player.row, player.col, dir)
+	player.row, player.col = makeMove2(player.row, player.col, dir)
 	switch maze[player.row][player.col] {
 	case '.':
 		numDots--
@@ -239,7 +239,7 @@ func movePlayer(dir string) {
 	}
 }
 
-func drawDirection() string {
+func drawDirection2() string {
 	dir := rand.Intn(4)
 	move := map[int]string{
 		0: "UP",
@@ -250,9 +250,9 @@ func drawDirection() string {
 	return move[dir]
 }
 
-func moveGhosts() {
+func moveGhosts2() {
 	for _, g := range ghosts {
 		dir := drawDirection()
-		g.row, g.col = makeMove(g.row, g.col, dir)
+		g.row, g.col = makeMove2(g.row, g.col, dir)
 	}
 }
