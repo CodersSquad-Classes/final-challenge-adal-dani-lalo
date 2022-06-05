@@ -2,17 +2,25 @@ package main
 
 import (
 	"bufio"
-	_ "image/gif"
+	"errors"
 	_ "image/png"
 	"log"
 	"math/rand"
 	"os"
+	"strconv"
 	"strings"
 	"time"
+
+	"image/color"
+
+	"github.com/hajimehoshi/ebiten/v2/examples/resources/fonts"
+	"golang.org/x/image/font"
+	"golang.org/x/image/font/opentype"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
+	"github.com/hajimehoshi/ebiten/v2/text"
 )
 
 var screenWidth float64
@@ -26,10 +34,32 @@ const ghostWidth float64 = 112
 const ghostHeight float64 = 106
 const pointSize float64 = 100
 
-const spriteSize = 20
-const spriteSizeSmaller = 15
+var arcadeFont font.Face
+var fontSize = 20.0
 
-type coord struct {
+const spriteSize = 20
+
+type playerType struct {
+	posX      int
+	posY      int
+	direction string
+	lives     int
+}
+
+type ghostType struct {
+	posX      int
+	posY      int
+	direction string
+	eaten     bool
+}
+
+type dotType struct {
+	posX  int
+	posY  int
+	eaten bool
+}
+
+type wallType struct {
 	posX int
 	posY int
 }
@@ -39,142 +69,153 @@ type playerSprite struct {
 	left  *ebiten.Image
 	down  *ebiten.Image
 	up    *ebiten.Image
+	death *ebiten.Image
 }
 
 type Game struct {
 	maze          [][]string
 	score         int
-	lives         int
 	numDots       int
-	walls         []*coord
+	numGhosts     int
+	walls         []*wallType
 	wallSprite    *ebiten.Image
-	player        coord
+	player        playerType
 	playerSprites playerSprite
-	playerDir     string
-	ghosts        []*coord
+	ghosts        []*ghostType
 	ghostSprite   *ebiten.Image
-	points        []*coord
-	pointSprite   *ebiten.Image
+	dots          []*dotType
+	dotSprite     *ebiten.Image
+	powerDots     []*dotType
 }
 
 func (g *Game) Update() error {
 
+	/*if ebiten.IsKeyPressed(ebiten.KeyRight) {
+		g.player.posX += 1
+		g.player.direction = "Right"
+	}*/
+
 	for _, k := range inpututil.PressedKeys() {
-		if k == ebiten.KeyRight {
+		if k == ebiten.KeyRight && !g.nextIsWall("Right") {
 			g.player.posX += 1
-			g.playerDir = "Right"
-		} else if k == ebiten.KeyLeft {
+			g.player.direction = "Right"
+		} else if k == ebiten.KeyLeft && !g.nextIsWall("Left") {
 			g.player.posX -= 1
-			g.playerDir = "Left"
-		} else if k == ebiten.KeyUp {
+			g.player.direction = "Left"
+		} else if k == ebiten.KeyUp && !g.nextIsWall("Up") {
 			g.player.posY -= 1
-			g.playerDir = "Up"
-		} else if k == ebiten.KeyDown {
+			g.player.direction = "Up"
+		} else if k == ebiten.KeyDown && !g.nextIsWall("Down") {
 			g.player.posY += 1
-			g.playerDir = "Down"
+			g.player.direction = "Down"
 		} else if k == ebiten.KeyEscape {
-			g.lives = 0
+			g.player.lives = 0
 		}
 
-		if relativePos(g.player.posX) > screenWidth {
-			g.player.posX = -1
+		if g.player.posX > len(g.maze[0]) {
+			g.player.posX = 0
 		}
 
-		if relativePos(g.player.posX) < 0-playerWidth {
+		if g.player.posX < 0 {
 			g.player.posX = len(g.maze[0])
-		}
-
-		if g.player.posY <= 0 {
-			g.player.posY = 0
-		}
-
-		if relativePos(g.player.posY) >= screenHeight-playerHeight {
-			g.player.posY = len(g.maze) - 1
 		}
 	}
 
 	g.moveGhosts()
+
+	for _, ghost := range g.ghosts {
+		if g.player.posX == ghost.posX && g.player.posY == ghost.posY {
+			g.player.lives = 0
+		}
+	}
+
+	for _, dot := range g.dots {
+		if g.player.posX == dot.posX && g.player.posY == dot.posY && !dot.eaten {
+			g.score += 10
+			g.numDots -= 1
+			dot.eaten = true
+		}
+	}
+
+	for _, powerDot := range g.powerDots {
+		if g.player.posX == powerDot.posX && g.player.posY == powerDot.posY && !powerDot.eaten {
+			g.score += 50
+			g.numDots -= 1
+			powerDot.eaten = true
+		}
+	}
 
 	time.Sleep(200 * time.Millisecond)
 	return nil
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
-	//draw pacman
+	//draw walls
+	opWall := &ebiten.DrawImageOptions{}
+	wallHScale := spriteSize / wallHeight
+	wallWScale := spriteSize / wallWidth
+
+	for _, wall := range g.walls {
+		opWall.GeoM.Scale(wallWScale, wallHScale)
+		opWall.GeoM.Translate(relativePos(wall.posX), relativePos(wall.posY))
+		screen.DrawImage(g.wallSprite, opWall)
+		opWall.GeoM.Reset()
+	}
+
+	//drawn dots
+	opDot := &ebiten.DrawImageOptions{}
+	dotHScale := spriteSize / pointSize
+	dotWScale := spriteSize / pointSize
+
+	for _, dot := range g.dots {
+		if dot.eaten {
+			continue
+		}
+		opDot.GeoM.Scale(dotWScale, dotHScale)
+		opDot.GeoM.Translate(relativePos(dot.posX), relativePos(dot.posY))
+		screen.DrawImage(g.dotSprite, opDot)
+		opDot.GeoM.Reset()
+	}
+
+	//drawn power dots
+	opPowerDot := &ebiten.DrawImageOptions{}
+	powerDotHScale := spriteSize / pointSize * 3
+	powerDotWScale := spriteSize / pointSize * 3
+
+	for _, powerDot := range g.powerDots {
+		if powerDot.eaten {
+			continue
+		}
+		opPowerDot.GeoM.Scale(powerDotWScale, powerDotHScale)
+		opPowerDot.GeoM.Translate(relativePos(powerDot.posX)-spriteSize, relativePos(powerDot.posY)-spriteSize)
+		screen.DrawImage(g.dotSprite, opPowerDot)
+		opPowerDot.GeoM.Reset()
+	}
+
+	//drawn ghosts
+	opGhost := &ebiten.DrawImageOptions{}
+	ghostHScale := spriteSize / ghostHeight
+	ghostWScale := spriteSize / ghostWidth
+
+	for _, ghost := range g.ghosts {
+		opGhost.GeoM.Scale(ghostWScale, ghostHScale)
+		opGhost.GeoM.Translate(relativePos(ghost.posX), relativePos(ghost.posY))
+		screen.DrawImage(g.ghostSprite, opGhost)
+		opGhost.GeoM.Reset()
+	}
+
+	//draw player
 	opPlayer := &ebiten.DrawImageOptions{}
-	playerH := spriteSize / playerHeight //CAMBIAR NOMBRE VARIABLE
-	playerW := spriteSize / playerWidth  //CAMBIAR NOMBRE VARIABLE
-	opPlayer.GeoM.Scale(playerW, playerH)
+	playerHScale := spriteSize / playerHeight
+	playerWScale := spriteSize / playerWidth
+	opPlayer.GeoM.Scale(playerHScale, playerWScale)
 	opPlayer.GeoM.Translate(relativePos(g.player.posX), relativePos(g.player.posY))
 
 	screen.DrawImage(g.playerSpriteDir(), opPlayer)
 
-	//draw walls
-	opWall := &ebiten.DrawImageOptions{}
-	wallH := spriteSize / wallHeight //CAMBIAR NOMBRE VARIABLE
-	wallW := spriteSize / wallWidth  //CAMBIAR NOMBRE VARIABLE
-	//var wallPosX float64
-	//var wallPosY float64
-	//var prevWallPosX float64 = 0
-	//var prevWallPosY float64 = 0
-
-	for _, wall := range g.walls {
-		opWall.GeoM.Scale(wallW, wallH)
-		opWall.GeoM.Translate(relativePos(wall.posX), relativePos(wall.posY))
-		screen.DrawImage(g.wallSprite, opWall)
-		opWall.GeoM.Reset()
-
-		//prevWallPosX = wall.posX
-		//prevWallPosY = wall.posY
-	}
-
-	/*for i := 0; i < len(g.maze); i++ {
-		//fmt.Printf("%s\n", g.maze[i])
-		for j := 0; j < len(g.maze[0]); j++ {
-			switch g.maze[i][j] {
-			case "#":
-				wallPosX = float64(j * spriteSize)
-				wallPosY = float64(i * spriteSize)
-
-				opWall.GeoM.Translate(wallPosX-prevWallPosX, wallPosY-prevWallPosY)
-				screen.DrawImage(g.wallSprite, opWall)
-
-				prevWallPosX = wallPosX
-				prevWallPosY = wallPosY
-			}
-		}
-	}*/
-
-	//drawn ghosts
-	opGhost := &ebiten.DrawImageOptions{}
-	ghostH := spriteSize / ghostHeight //CAMBIAR NOMBRE VARIABLE
-	ghostW := spriteSize / ghostWidth  //CAMBIAR NOMBRE VARIABLE
-
-	//var prevGhostPosX float64 = 0
-	//var prevGhostPosY float64 = 0
-
-	for _, ghost := range g.ghosts {
-		//fmt.Printf("%v, %v\n", ghost.posX, ghost.posY)
-		opGhost.GeoM.Scale(ghostW, ghostH)
-		opGhost.GeoM.Translate(relativePos(ghost.posX), relativePos(ghost.posY))
-		screen.DrawImage(g.ghostSprite, opGhost)
-		opGhost.GeoM.Reset()
-
-		//prevGhostPosX = ghost.posX
-		//prevGhostPosY = ghost.posY
-	}
-
-	//drawn points
-	opPoint := &ebiten.DrawImageOptions{}
-	pointH := spriteSize / pointSize //CAMBIAR NOMBRE VARIABLE
-	pointW := spriteSize / pointSize //CAMBIAR NOMBRE VARIABLE
-
-	for _, point := range g.points {
-		opPoint.GeoM.Scale(pointW, pointH)
-		opPoint.GeoM.Translate(relativePos(point.posX), relativePos(point.posY))
-		screen.DrawImage(g.pointSprite, opPoint)
-		opPoint.GeoM.Reset()
-	}
+	//draw score
+	str := "SCORE: " + strconv.Itoa(g.score)
+	text.Draw(screen, str, arcadeFont, 0, len(g.maze)*spriteSize+spriteSize, color.White)
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
@@ -182,6 +223,59 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
 }
 
 func main() {
+	g := &Game{}
+
+	g.readArg()
+	g.readFont()
+	g.readSprites()
+	g.readMaze("Maze.txt")
+	g.setWindowConfig()
+	g.initialiseGhots()
+
+	err := ebiten.RunGame(g)
+	checkError(err, "Run game error")
+}
+
+func (g *Game) initialiseGhots() {
+
+}
+
+//MAIN FUNCTIONS
+
+func (g *Game) readArg() {
+	if len(os.Args) == 3 {
+		if os.Args[1] == "--enemies" {
+			numGhosts, err := strconv.Atoi(os.Args[2])
+			checkError(err, "Expected arguments: --enemies 3")
+			if numGhosts < 1 || numGhosts > 9 {
+				err = errors.New("Incorrect number of enemies")
+				checkError(err, "Number of enemies can't be lower than 1 or higher than 9")
+			} else {
+				g.numGhosts = numGhosts
+			}
+		} else {
+			err := errors.New("Incorrect arguments")
+			checkError(err, "Expected arguments: --enemies 3")
+		}
+	} else {
+		err := errors.New("Incorrect arguments")
+		checkError(err, "Expected arguments: --enemies 3")
+	}
+}
+
+func (g *Game) readFont() {
+	tt, err := opentype.Parse(fonts.MPlus1pRegular_ttf)
+	checkError(err, "Error loading font")
+
+	arcadeFont, err = opentype.NewFace(tt, &opentype.FaceOptions{
+		Size:    fontSize,
+		DPI:     72,
+		Hinting: font.HintingFull,
+	})
+	checkError(err, "Error loading font")
+}
+
+func (g *Game) readSprites() {
 	playerRightImg, _, err := ebitenutil.NewImageFromFile("assets/pacman_derecha.png")
 	checkError(err, "Load player image error")
 	playerLeftImg, _, err := ebitenutil.NewImageFromFile("assets/pacman_izquierda.png")
@@ -190,41 +284,24 @@ func main() {
 	checkError(err, "Load player image error")
 	playerDownImg, _, err := ebitenutil.NewImageFromFile("assets/pacman_abajo.png")
 	checkError(err, "Load player image error")
+	playerDeathImg, _, err := ebitenutil.NewImageFromFile("assets/wall.png")
+	checkError(err, "Load player image error")
 	wallImg, _, err := ebitenutil.NewImageFromFile("assets/wall.png")
 	checkError(err, "Load wall image error")
-	ghostImg, _, err := ebitenutil.NewImageFromFile("assets/200.gif")
+	ghostImg, _, err := ebitenutil.NewImageFromFile("assets/ghost_derecha.png")
 	checkError(err, "Load ghost image error")
-	pointImg, _, err := ebitenutil.NewImageFromFile("assets/punto.png")
+	dotImg, _, err := ebitenutil.NewImageFromFile("assets/punto.png")
 	checkError(err, "Load point image error")
 
-	g := &Game{}
 	g.wallSprite = wallImg
 	g.playerSprites.right = playerRightImg
 	g.playerSprites.left = playerLeftImg
 	g.playerSprites.up = playerUpImg
 	g.playerSprites.down = playerDownImg
+	g.playerSprites.death = playerDeathImg
 	g.ghostSprite = ghostImg
-	g.pointSprite = pointImg
-
-	g.playerDir = "Right"
-	g.lives = 1
-
-	g.readMaze("Maze.txt")
-
-	screenWidth = float64(len(g.maze[0]) * spriteSize)
-	screenHeight = float64(len(g.maze) * spriteSize)
-
-	ebiten.SetWindowSize(int(screenWidth), int(screenHeight))
-	ebiten.SetWindowTitle("Pacman")
-
-	//g.playPosX = screenWidth/2 - playerWidth/2
-	//g.playPosY = screenHeight/2 - playerHeight/2
-
-	err = ebiten.RunGame(g)
-	checkError(err, "Run game error")
+	g.dotSprite = dotImg
 }
-
-//Funciones fuera del loop del juego
 
 func (g *Game) readMaze(fileName string) {
 	file, err := os.Open(fileName)
@@ -245,98 +322,137 @@ func (g *Game) readMaze(fileName string) {
 				//wallPosX := j * spriteSize
 				//wallPosY := i * spriteSize
 
-				g.walls = append(g.walls, &coord{j, i})
+				g.walls = append(g.walls, &wallType{j, i})
 			case "P":
 				//playerPosX := j * spriteSize
 				//playerPosY := i * spriteSize
 
-				g.player = coord{j, i}
+				g.player = playerType{j, i, "Right", 1}
 			case "G":
 				//ghostPosX := j * spriteSize
 				//ghostPosY := i * spriteSize
 
-				g.ghosts = append(g.ghosts, &coord{j, i})
+				g.ghosts = append(g.ghosts, &ghostType{j, i, "Up", false})
 			case ".":
 				//pointPosX := j * spriteSize
 				//pointPosY := i * spriteSize
-
-				g.points = append(g.points, &coord{j, i})
+				g.numDots += 1
+				g.dots = append(g.dots, &dotType{j, i, false})
+			case "O":
+				g.numDots += 1
+				g.powerDots = append(g.powerDots, &dotType{j, i, false})
 			}
 		}
 	}
-	/*for _, wall := range g.walls {
-		fmt.Printf("%v, %v\n", wall.posX, wall.posY)
-	}*/
 }
+
+func (g *Game) setWindowConfig() {
+	screenWidth = float64(len(g.maze[0]) * spriteSize)
+	screenHeight = float64(len(g.maze)*spriteSize + spriteSize)
+
+	ebiten.SetWindowSize(int(screenWidth), int(screenHeight))
+	ebiten.SetWindowTitle("Pacman")
+}
+
+//GAMELOOP FUNCTIONS
 
 func relativePos(coordinate int) (coordRelative float64) {
 	return float64(coordinate * spriteSize)
 }
 
-func (g *Game) makeMove(oldCol, oldRow int, dir string) (newCol, newRow int) {
-	newRow, newCol = oldRow, oldCol
+func (g *Game) nextIsWall(dir string) bool {
+	newY, newX := g.player.posY, g.player.posX
 
 	switch dir {
-	case "UP":
-		newRow = newRow - 1
-		if newRow < 0 {
-			newRow = len(g.maze) - 1
-		}
-	case "DOWN":
-		newRow = newRow + 1
-		if newRow == len(g.maze) {
-			newRow = 0
-		}
-	case "RIGHT":
-		newCol = newCol + 1
-		if newCol == len(g.maze[0]) {
-			newCol = 0
-		}
-	case "LEFT":
-		newCol = newCol - 1
-		if newCol < 0 {
-			newCol = len(g.maze[0]) - 1
-		}
+	case "Up":
+		newY = newY - 1
+	case "Down":
+		newY = newY + 1
+	case "Right":
+		newX = newX + 1
+	case "Left":
+		newX = newX - 1
 	}
 
-	if g.maze[newRow][newCol] == "#" {
-		newRow = oldRow
-		newCol = oldCol
+	if newX > len(g.maze[0]) || newX < 0 { //return false if entity entered the tunel
+		return false
+	} else if g.maze[newY][newX] == "#" {
+		return true
+	} else {
+		return false
 	}
-
-	return
-}
-
-func drawDirection() string {
-	dir := rand.Intn(4)
-	move := map[int]string{
-		0: "UP",
-		1: "DOWN",
-		2: "RIGHT",
-		3: "LEFT",
-	}
-	return move[dir]
 }
 
 func (g *Game) moveGhosts() {
 	for _, ghost := range g.ghosts {
-		dir := drawDirection()
-		ghost.posX, ghost.posY = g.makeMove(ghost.posX, ghost.posY, dir)
+		g.makeMove(ghost)
 	}
 }
 
-func (g *Game) playerSpriteDir() *ebiten.Image {
-	switch g.playerDir {
-	case "Right":
-		return g.playerSprites.right
-	case "Left":
-		return g.playerSprites.left
+//func (g *Game) makeMove(oldCol, oldRow int, dir string) (newCol, newRow int) {
+func (g *Game) makeMove(entity *ghostType) {
+	newY, newX := entity.posY, entity.posX
+
+	switch entity.direction {
 	case "Up":
-		return g.playerSprites.up
+		newY = newY - 1
+		/*if newRow < 0 {
+			newRow = len(g.maze) - 1
+		}*/
 	case "Down":
-		return g.playerSprites.down
-	default:
-		return g.playerSprites.right
+		newY = newY + 1
+		/*if newRow == len(g.maze) {
+			newRow = 0
+		}*/
+	case "Right":
+		newX = newX + 1
+		if newX == len(g.maze[0]) {
+			newX = 0
+		}
+	case "Left":
+		newX = newX - 1
+		if newX < 0 {
+			newX = len(g.maze[0]) - 1
+		}
+	}
+
+	if g.maze[newY][newX] == "#" {
+		entity.direction = drawDirection()
+		g.makeMove(entity)
+	} else {
+		entity.posX = newX
+		entity.posY = newY
+	}
+}
+
+func drawDirection() string {
+	rand.Seed(time.Now().UnixNano())
+	dir := rand.Intn(4)
+	move := map[int]string{
+		0: "Up",
+		1: "Down",
+		2: "Right",
+		3: "Left",
+	}
+	return move[dir]
+}
+
+func (g *Game) playerSpriteDir() *ebiten.Image {
+	if g.player.lives == 0 {
+		return g.playerSprites.death
+	} else {
+		switch g.player.direction {
+		case "Right":
+			return g.playerSprites.right
+		case "Left":
+			return g.playerSprites.left
+		case "Up":
+			return g.playerSprites.up
+		case "Down":
+			return g.playerSprites.down
+		default:
+			return g.playerSprites.right
+		}
 	}
 }
 
