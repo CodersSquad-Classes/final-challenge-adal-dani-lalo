@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"errors"
+	"fmt"
 	_ "image/png"
 	"log"
 	"math/rand"
@@ -121,7 +122,7 @@ func (g *Game) Update() error {
 		}
 	}
 
-	g.moveGhosts()
+	//g.moveGhosts()
 
 	for _, ghost := range g.ghosts {
 		if g.player.posX == ghost.posX && g.player.posY == ghost.posY {
@@ -237,7 +238,45 @@ func main() {
 }
 
 func (g *Game) initialiseGhots() {
+	for _, ghost := range g.ghosts {
+		go g.ghostFuncionability(ghost)
+	}
+}
 
+func (g *Game) ghostFuncionability(ghost *ghostType) {
+	for {
+		for {
+			newY, newX := ghost.posY, ghost.posX
+
+			switch ghost.direction {
+			case "Up":
+				newY = newY - 1
+
+			case "Down":
+				newY = newY + 1
+
+			case "Right":
+				newX = newX + 1
+				if newX == len(g.maze[0]) {
+					newX = 0
+				}
+			case "Left":
+				newX = newX - 1
+				if newX < 0 {
+					newX = len(g.maze[0]) - 1
+				}
+			}
+
+			if g.maze[newY][newX] == "#" {
+				ghost.direction = drawDirection()
+			} else {
+				ghost.posX = newX
+				ghost.posY = newY
+				break
+			}
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
 }
 
 //MAIN FUNCTIONS
@@ -315,27 +354,32 @@ func (g *Game) readMaze(fileName string) {
 
 	file.Close()
 
+	var ghostPositions []int
+	for i := 0; i < g.numGhosts; i++ {
+		rand.Seed(time.Now().UnixNano())
+		ghostPos := rand.Intn(9)
+		if valueIsInSlice(ghostPos, ghostPositions) {
+			i -= 1
+		} else {
+			fmt.Print(ghostPos)
+			ghostPositions = append(ghostPositions, ghostPos)
+		}
+	}
+	indexGhosts := 0
+
 	for i := 0; i < len(g.maze); i++ {
 		for j := 0; j < len(g.maze[0]); j++ {
 			switch g.maze[i][j] {
 			case "#":
-				//wallPosX := j * spriteSize
-				//wallPosY := i * spriteSize
-
 				g.walls = append(g.walls, &wallType{j, i})
 			case "P":
-				//playerPosX := j * spriteSize
-				//playerPosY := i * spriteSize
-
 				g.player = playerType{j, i, "Right", 1}
 			case "G":
-				//ghostPosX := j * spriteSize
-				//ghostPosY := i * spriteSize
-
-				g.ghosts = append(g.ghosts, &ghostType{j, i, "Up", false})
+				if valueIsInSlice(indexGhosts, ghostPositions) {
+					g.ghosts = append(g.ghosts, &ghostType{j, i, "Up", false})
+				}
+				indexGhosts += 1
 			case ".":
-				//pointPosX := j * spriteSize
-				//pointPosY := i * spriteSize
 				g.numDots += 1
 				g.dots = append(g.dots, &dotType{j, i, false})
 			case "O":
@@ -355,6 +399,15 @@ func (g *Game) setWindowConfig() {
 }
 
 //GAMELOOP FUNCTIONS
+
+func valueIsInSlice(x int, slice []int) bool {
+	for _, y := range slice {
+		if y == x {
+			return true
+		}
+	}
+	return false
+}
 
 func relativePos(coordinate int) (coordRelative float64) {
 	return float64(coordinate * spriteSize)
