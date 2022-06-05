@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"errors"
-	"fmt"
 	_ "image/png"
 	"log"
 	"math/rand"
@@ -52,6 +51,7 @@ type ghostType struct {
 	posY      int
 	direction string
 	eaten     bool
+	isOut     bool
 }
 
 type dotType struct {
@@ -73,7 +73,14 @@ type playerSprite struct {
 	death *ebiten.Image
 }
 
+type ghostSprite struct {
+	right      *ebiten.Image
+	left       *ebiten.Image
+	vulnerable *ebiten.Image
+}
+
 type Game struct {
+	mode          string
 	maze          [][]string
 	score         int
 	numDots       int
@@ -83,70 +90,83 @@ type Game struct {
 	player        playerType
 	playerSprites playerSprite
 	ghosts        []*ghostType
-	ghostSprite   *ebiten.Image
+	ghostSprites  ghostSprite
 	dots          []*dotType
 	dotSprite     *ebiten.Image
 	powerDots     []*dotType
+	doors         []*wallType
 }
 
 func (g *Game) Update() error {
+
+	switch g.mode {
+	case "Start":
+		if ebiten.IsKeyPressed(ebiten.KeyEnter) {
+			g.mode = "Game"
+		}
+	case "Game":
+		if g.numDots == 0 {
+			g.mode = "End"
+		}
+
+		for _, ghost := range g.ghosts {
+			if g.player.posX == ghost.posX && g.player.posY == ghost.posY {
+				g.player.lives = 0
+				g.mode = "End"
+			}
+		}
+
+		for _, dot := range g.dots {
+			if g.player.posX == dot.posX && g.player.posY == dot.posY && !dot.eaten {
+				g.score += 10
+				g.numDots -= 1
+				dot.eaten = true
+			}
+		}
+
+		for _, powerDot := range g.powerDots {
+			if g.player.posX == powerDot.posX && g.player.posY == powerDot.posY && !powerDot.eaten {
+				g.score += 50
+				g.numDots -= 1
+				powerDot.eaten = true
+			}
+		}
+
+		for _, k := range inpututil.PressedKeys() {
+			if k == ebiten.KeyRight && !g.nextIsWall("Right") {
+				g.player.posX += 1
+				g.player.direction = "Right"
+			} else if k == ebiten.KeyLeft && !g.nextIsWall("Left") {
+				g.player.posX -= 1
+				g.player.direction = "Left"
+			} else if k == ebiten.KeyUp && !g.nextIsWall("Up") {
+				g.player.posY -= 1
+				g.player.direction = "Up"
+			} else if k == ebiten.KeyDown && !g.nextIsWall("Down") {
+				g.player.posY += 1
+				g.player.direction = "Down"
+			} else if k == ebiten.KeyEscape {
+				g.player.lives = 0
+			}
+
+			if g.player.posX > len(g.maze[0]) {
+				g.player.posX = 0
+			}
+
+			if g.player.posX < 0 {
+				g.player.posX = len(g.maze[0])
+			}
+		}
+
+		time.Sleep(200 * time.Millisecond)
+	case "End":
+	}
 
 	/*if ebiten.IsKeyPressed(ebiten.KeyRight) {
 		g.player.posX += 1
 		g.player.direction = "Right"
 	}*/
 
-	for _, k := range inpututil.PressedKeys() {
-		if k == ebiten.KeyRight && !g.nextIsWall("Right") {
-			g.player.posX += 1
-			g.player.direction = "Right"
-		} else if k == ebiten.KeyLeft && !g.nextIsWall("Left") {
-			g.player.posX -= 1
-			g.player.direction = "Left"
-		} else if k == ebiten.KeyUp && !g.nextIsWall("Up") {
-			g.player.posY -= 1
-			g.player.direction = "Up"
-		} else if k == ebiten.KeyDown && !g.nextIsWall("Down") {
-			g.player.posY += 1
-			g.player.direction = "Down"
-		} else if k == ebiten.KeyEscape {
-			g.player.lives = 0
-		}
-
-		if g.player.posX > len(g.maze[0]) {
-			g.player.posX = 0
-		}
-
-		if g.player.posX < 0 {
-			g.player.posX = len(g.maze[0])
-		}
-	}
-
-	//g.moveGhosts()
-
-	for _, ghost := range g.ghosts {
-		if g.player.posX == ghost.posX && g.player.posY == ghost.posY {
-			g.player.lives = 0
-		}
-	}
-
-	for _, dot := range g.dots {
-		if g.player.posX == dot.posX && g.player.posY == dot.posY && !dot.eaten {
-			g.score += 10
-			g.numDots -= 1
-			dot.eaten = true
-		}
-	}
-
-	for _, powerDot := range g.powerDots {
-		if g.player.posX == powerDot.posX && g.player.posY == powerDot.posY && !powerDot.eaten {
-			g.score += 50
-			g.numDots -= 1
-			powerDot.eaten = true
-		}
-	}
-
-	time.Sleep(200 * time.Millisecond)
 	return nil
 }
 
@@ -201,7 +221,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	for _, ghost := range g.ghosts {
 		opGhost.GeoM.Scale(ghostWScale, ghostHScale)
 		opGhost.GeoM.Translate(relativePos(ghost.posX), relativePos(ghost.posY))
-		screen.DrawImage(g.ghostSprite, opGhost)
+		screen.DrawImage(g.ghostSprites.right, opGhost)
 		opGhost.GeoM.Reset()
 	}
 
@@ -217,6 +237,23 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	//draw score
 	str := "SCORE: " + strconv.Itoa(g.score)
 	text.Draw(screen, str, arcadeFont, 0, len(g.maze)*spriteSize+spriteSize, color.White)
+
+	//draw start text
+	if g.mode == "Start" {
+		startStr := "PRESS ENTER TO START"
+		text.Draw(screen, startStr, arcadeFont, int(screenWidth/4), int(screenHeight/2)-spriteSize, color.White)
+	}
+
+	//draw end text
+	if g.mode == "End" {
+		if g.player.lives == 0 {
+			startStr := "YOU LOSE"
+			text.Draw(screen, startStr, arcadeFont, int(screenWidth/4), int(screenHeight/2)-spriteSize, color.White)
+		} else {
+			startStr := "YOU WON"
+			text.Draw(screen, startStr, arcadeFont, int(screenWidth/4), int(screenHeight/2)-spriteSize, color.White)
+		}
+	}
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
@@ -233,50 +270,10 @@ func main() {
 	g.setWindowConfig()
 	g.initialiseGhots()
 
+	g.mode = "Start"
+
 	err := ebiten.RunGame(g)
 	checkError(err, "Run game error")
-}
-
-func (g *Game) initialiseGhots() {
-	for _, ghost := range g.ghosts {
-		go g.ghostFuncionability(ghost)
-	}
-}
-
-func (g *Game) ghostFuncionability(ghost *ghostType) {
-	for {
-		for {
-			newY, newX := ghost.posY, ghost.posX
-
-			switch ghost.direction {
-			case "Up":
-				newY = newY - 1
-
-			case "Down":
-				newY = newY + 1
-
-			case "Right":
-				newX = newX + 1
-				if newX == len(g.maze[0]) {
-					newX = 0
-				}
-			case "Left":
-				newX = newX - 1
-				if newX < 0 {
-					newX = len(g.maze[0]) - 1
-				}
-			}
-
-			if g.maze[newY][newX] == "#" {
-				ghost.direction = drawDirection()
-			} else {
-				ghost.posX = newX
-				ghost.posY = newY
-				break
-			}
-		}
-		time.Sleep(200 * time.Millisecond)
-	}
 }
 
 //MAIN FUNCTIONS
@@ -327,7 +324,11 @@ func (g *Game) readSprites() {
 	checkError(err, "Load player image error")
 	wallImg, _, err := ebitenutil.NewImageFromFile("assets/wall.png")
 	checkError(err, "Load wall image error")
-	ghostImg, _, err := ebitenutil.NewImageFromFile("assets/ghost_derecha.png")
+	ghostRightImg, _, err := ebitenutil.NewImageFromFile("assets/ghost_derecha.png")
+	checkError(err, "Load ghost image error")
+	ghostLeftImg, _, err := ebitenutil.NewImageFromFile("assets/ghost_izquierda.png")
+	checkError(err, "Load ghost image error")
+	ghostVulnerableImg, _, err := ebitenutil.NewImageFromFile("assets/ghost_izquierda.png")
 	checkError(err, "Load ghost image error")
 	dotImg, _, err := ebitenutil.NewImageFromFile("assets/punto.png")
 	checkError(err, "Load point image error")
@@ -338,7 +339,9 @@ func (g *Game) readSprites() {
 	g.playerSprites.up = playerUpImg
 	g.playerSprites.down = playerDownImg
 	g.playerSprites.death = playerDeathImg
-	g.ghostSprite = ghostImg
+	g.ghostSprites.right = ghostRightImg
+	g.ghostSprites.left = ghostLeftImg
+	g.ghostSprites.vulnerable = ghostVulnerableImg
 	g.dotSprite = dotImg
 }
 
@@ -361,10 +364,10 @@ func (g *Game) readMaze(fileName string) {
 		if valueIsInSlice(ghostPos, ghostPositions) {
 			i -= 1
 		} else {
-			fmt.Print(ghostPos)
 			ghostPositions = append(ghostPositions, ghostPos)
 		}
 	}
+
 	indexGhosts := 0
 
 	for i := 0; i < len(g.maze); i++ {
@@ -372,11 +375,13 @@ func (g *Game) readMaze(fileName string) {
 			switch g.maze[i][j] {
 			case "#":
 				g.walls = append(g.walls, &wallType{j, i})
+			case "-":
+				g.doors = append(g.doors, &wallType{j, i})
 			case "P":
 				g.player = playerType{j, i, "Right", 1}
 			case "G":
 				if valueIsInSlice(indexGhosts, ghostPositions) {
-					g.ghosts = append(g.ghosts, &ghostType{j, i, "Up", false})
+					g.ghosts = append(g.ghosts, &ghostType{j, i, "Up", false, false})
 				}
 				indexGhosts += 1
 			case ".":
@@ -396,6 +401,56 @@ func (g *Game) setWindowConfig() {
 
 	ebiten.SetWindowSize(int(screenWidth), int(screenHeight))
 	ebiten.SetWindowTitle("Pacman")
+}
+
+func (g *Game) initialiseGhots() {
+	for _, ghost := range g.ghosts {
+		go g.ghostFuncionability(ghost)
+	}
+}
+
+func (g *Game) ghostFuncionability(ghost *ghostType) {
+	for {
+		switch g.mode {
+		case "Game":
+			for {
+				newY, newX := ghost.posY, ghost.posX
+
+				switch ghost.direction {
+				case "Up":
+					newY = newY - 1
+
+				case "Down":
+					newY = newY + 1
+
+				case "Right":
+					newX = newX + 1
+					if newX == len(g.maze[0]) {
+						newX = 0
+					}
+				case "Left":
+					newX = newX - 1
+					if newX < 0 {
+						newX = len(g.maze[0]) - 1
+					}
+				}
+
+				if g.maze[newY][newX] == "-" && !ghost.isOut {
+					ghost.isOut = true
+					ghost.posX = newX
+					ghost.posY = newY
+					break
+				} else if g.maze[newY][newX] == "#" || (g.maze[newY][newX] == "-" && ghost.isOut) {
+					ghost.direction = drawDirection()
+				} else {
+					ghost.posX = newX
+					ghost.posY = newY
+					break
+				}
+			}
+			time.Sleep(200 * time.Millisecond)
+		}
+	}
 }
 
 //GAMELOOP FUNCTIONS
@@ -436,48 +491,6 @@ func (g *Game) nextIsWall(dir string) bool {
 	}
 }
 
-func (g *Game) moveGhosts() {
-	for _, ghost := range g.ghosts {
-		g.makeMove(ghost)
-	}
-}
-
-//func (g *Game) makeMove(oldCol, oldRow int, dir string) (newCol, newRow int) {
-func (g *Game) makeMove(entity *ghostType) {
-	newY, newX := entity.posY, entity.posX
-
-	switch entity.direction {
-	case "Up":
-		newY = newY - 1
-		/*if newRow < 0 {
-			newRow = len(g.maze) - 1
-		}*/
-	case "Down":
-		newY = newY + 1
-		/*if newRow == len(g.maze) {
-			newRow = 0
-		}*/
-	case "Right":
-		newX = newX + 1
-		if newX == len(g.maze[0]) {
-			newX = 0
-		}
-	case "Left":
-		newX = newX - 1
-		if newX < 0 {
-			newX = len(g.maze[0]) - 1
-		}
-	}
-
-	if g.maze[newY][newX] == "#" {
-		entity.direction = drawDirection()
-		g.makeMove(entity)
-	} else {
-		entity.posX = newX
-		entity.posY = newY
-	}
-}
-
 func drawDirection() string {
 	rand.Seed(time.Now().UnixNano())
 	dir := rand.Intn(4)
@@ -515,3 +528,45 @@ func checkError(err error, message string) {
 		panic(err)
 	}
 }
+
+/*func (g *Game) moveGhosts() {
+	for _, ghost := range g.ghosts {
+		g.makeMove(ghost)
+	}
+}
+
+//func (g *Game) makeMove(oldCol, oldRow int, dir string) (newCol, newRow int) {
+func (g *Game) makeMove(entity *ghostType) {
+	newY, newX := entity.posY, entity.posX
+
+	switch entity.direction {
+	case "Up":
+		newY = newY - 1
+		if newRow < 0 {
+			newRow = len(g.maze) - 1
+		}
+	case "Down":
+		newY = newY + 1
+		if newRow == len(g.maze) {
+			newRow = 0
+		}
+	case "Right":
+		newX = newX + 1
+		if newX == len(g.maze[0]) {
+			newX = 0
+		}
+	case "Left":
+		newX = newX - 1
+		if newX < 0 {
+			newX = len(g.maze[0]) - 1
+		}
+	}
+
+	if g.maze[newY][newX] == "#" {
+		entity.direction = drawDirection()
+		g.makeMove(entity)
+	} else {
+		entity.posX = newX
+		entity.posY = newY
+	}
+}*/
