@@ -10,6 +10,7 @@ For the graphical interface we used Ebiten, a framework for making videogames in
 
 ## Diagram architecture
 The overall flow of the Pac-Man game consists of the following threads.
+
 ![pacman_architecture drawio](https://user-images.githubusercontent.com/78662124/172498190-7ef9e68b-fda0-467a-95dc-c58c9800ff6c.png)
 
 ## Data structures
