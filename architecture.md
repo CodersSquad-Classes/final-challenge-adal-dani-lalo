@@ -23,9 +23,9 @@ We defined structure types for every element in our game:
   
 The game struct contains common information for easy access during the progress of the game. For example, it stores the maze structure, the sprites, and other counting data like 
 
-## Functions
+## Main functions
 
-**main()**: creates a game instance and calls various initiliazer methods, which read the command arguments, read the maze, read sprite files, set the Ebiten window and initialise ghosts. Starts the game in "Start" mode. 
+**main()**: creates a game instance and calls various initiliazer methods. Starts the game in "Start" mode. 
 The sere the methods called on the game instance.
 
     -readArg():  reads command arguments
@@ -35,28 +35,49 @@ The sere the methods called on the game instance.
     -setWindowConfig(): set up Ebiten display window.
     -initialiseGhots(): initializes each ghost's own thread (goroutine).
   
-**Update()**: checks if the game has started or not. Updates booleans for ghosts, dots and powerDots (eaten/notEaten) as well as managing key buttons, 
-          checking if Pacman can move or there is a wall in between. ALso responsible for reapearing Pacman on the opposite side when out of a border.
+**Update()**: this is the gameloop, whichs is in charge of updating what the data structs and boolean frlags.
+
+    -It checks if the game has started or not.
+    -Updates booleans for ghosts, dots and powerDots (eaten/notEaten).
+    -Managing key buttons, checking if Pacman can move or there is a wall in between.
+    -Also responsible for reapearing Pacman on the opposite side when out of a border.
+
+**Layout()**: this is an Ebiten based function which is in charge of setting up the window where the game will display.
+
+**Draw()**: draws the game layout using Ebiten, which includes:
+
+     -Walls
+     -Dots
+     -Power dots
+     -Ghosts
+     -Player
+     -Score
+     -Start and end texts.
 
 
-Draw(): draws the game layout using Ebiten, which include walls, dots, power dots, ghosts, player, score, start and end texts.
+#### Goroutine ghost behaviour
+Instead of controlling all the ghosts in a single thread, we span as many goroutines as there are ghosts, so each ghost movement is managed in a separate goroutine. THe function that is called as a goroutine is the following:
 
-Layout()
+       - ghostFunctionality()
+      
+ This goroutine function makes frequent calls to a helper function:
+       
+       - getRandomDirection(): get a random direction for the next move.
+ 
+### Helper Functions
+These are a group of functions which constantly check wheter a certain boolean flag is true or not.
 
-makeGhostEatable(): when a powerDot is eaten, this function is called as a goroutine. It gives Pacman the ability to eat ghosts and lasts 10 seconds.
+       - valueIsInSlice(): check if a certain value is already in a given slice.
+       - nextIsWall(): checks if the next position Pac-Man wants to move is a wall.
+       - scaleCoord(): scale maze cell coordinate to screen pixel coordinate.
+       - restart()
+       - checkError()
 
-valueIsInSlice()
 
-relativePos()
+### Game Loop Functions
 
-nextIsWall()
+       -makeGhostEatable(): when a powerDot is eaten, this function is called as a goroutine. It gives Pacman the ability to eat ghosts and lasts 10             seconds.
 
-drawDirection()
+       -ghostSpriteDir(): returns the appropriate sprite based on the current ghost direction or state (in case it is vulnerable or normal).
 
-ghostSpriteDir()
-
-playerSpriteDir()
-
-restart()
-
-checkError()
+       -playerSpriteDir(): returns the appropriate sprite based on the current player direction and state (in case it is alive or dead).
