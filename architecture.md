@@ -2,6 +2,7 @@
 
 ## Description
 For the graphical interface we used Ebiten, a framework for making videogames in Go.
+![ebiten](https://user-images.githubusercontent.com/78662124/172483724-8182bcc2-746f-4986-bf9a-ad3c887d58cd.png)
 
 We defined structure types for every element in our game: 
   -Player struct
