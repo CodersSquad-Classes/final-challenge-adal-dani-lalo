@@ -1,9 +1,17 @@
 # Architecture
 
 ## Description
+This is a Pac-Man game imitation written in Go and built with Ebiten game engine.
+It is worth to mention that we made use of goroutines in various ways in this project, like on a separated movement control for each ghost. 
+
+## GUI
 For the graphical interface we used Ebiten, a framework for making videogames in Go.
 ![ebiten](https://user-images.githubusercontent.com/78662124/172483724-8182bcc2-746f-4986-bf9a-ad3c887d58cd.png)
 
+## Diagram architecture
+[diagram here]
+
+## Data structures
 We defined structure types for every element in our game: 
   -Player struct
   -Ghost struct
@@ -14,8 +22,6 @@ We defined structure types for every element in our game:
   -Game struct
   
 The game struct contains common information for easy access during the progress of the game. For example, it stores the maze structure, the sprites, and other counting data like 
-
-## Diagram architecture
 
 ## Functions
 
