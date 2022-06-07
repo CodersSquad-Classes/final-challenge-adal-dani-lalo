@@ -26,7 +26,7 @@ Update(): checks if the game has started or not. Updates booleans for ghosts, do
 Draw(): draws the game layout using Ebiten, which include walls, dots, power dots, ghosts, player, score, start and end texts.
 
 ### Main functions
-  readArg()
+  readArg()/n
   readFont()
   readSprites()
   readMaze()
