@@ -18,21 +18,20 @@ The game struct contains common information for easy access during the progress 
 
 ## Functions
 
-main(): creates a game instance and calls various initiliazer methods, which read the command arguments, read the maze, read sprite files, set the Ebiten window and initialise ghosts. Starts the game in "Start" mode.
+**main()**: creates a game instance and calls various initiliazer methods, which read the command arguments, read the maze, read sprite files, set the Ebiten window and initialise ghosts. Starts the game in "Start" mode.
 
-Update(): checks if the game has started or not. Updates booleans for ghosts, dots and powerDots (eaten/notEaten) as well as managing key buttons, 
+    -readArg()/n
+    -readFont()
+    -readSprites()
+    -readMaze()
+    -setWindowConfig()
+    -initialiseGhots()
+  
+**Update()**: checks if the game has started or not. Updates booleans for ghosts, dots and powerDots (eaten/notEaten) as well as managing key buttons, 
           checking if Pacman can move or there is a wall in between. ALso responsible for reapearing Pacman on the opposite side when out of a border.
 
 Draw(): draws the game layout using Ebiten, which include walls, dots, power dots, ghosts, player, score, start and end texts.
 
-### Main functions
-  readArg()/n
-  readFont()
-  readSprites()
-  readMaze()
-  setWindowConfig()
-  initialiseGhots()
-  
 Layout()
 
 makeGhostEatable(): when a powerDot is eaten, this function is called as a goroutine. It gives Pacman the ability to eat ghosts and lasts 10 seconds.
