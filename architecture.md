@@ -13,13 +13,13 @@ For the graphical interface we used Ebiten, a framework for making videogames in
 
 ## Data structures
 We defined structure types for every element in our game: 
-  -Player struct
-  -Ghost struct
-  -Dot Type
-  -Wall type
-  -Player Sprite
-  -Ghost Sprite
-  -Game struct
+       -Player struct
+       -Ghost struct
+       -Dot Type
+       -Wall type
+       -Player Sprite
+       -Ghost Sprite
+       -Game struct
   
 The game struct contains common information for easy access during the progress of the game. For example, it stores the maze structure, the sprites, and other counting data like 
 
