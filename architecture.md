@@ -18,17 +18,19 @@ The game struct contains common information for easy access during the progress 
 
 ## Functions
 
-**main()**: creates a game instance and calls various initiliazer methods, which read the command arguments, read the maze, read sprite files, set the Ebiten window and initialise ghosts. Starts the game in "Start" mode.
+**main()**: creates a game instance and calls various initiliazer methods, which read the command arguments, read the maze, read sprite files, set the Ebiten window and initialise ghosts. Starts the game in "Start" mode. 
+The sere the methods called on the game instance.
 
-    -readArg()/n
-    -readFont()
-    -readSprites()
-    -readMaze()
-    -setWindowConfig()
-    -initialiseGhots()
+    -readArg():  reads command arguments
+    -readFont(): loads the used font.
+    -readSprites(): loads the sprites and assigns them to variables ans structs.
+    -readMaze(): reads the txt defining the maze. Walls, dots and other elements are represented by symbols in the txt file.
+    -setWindowConfig(): set up Ebiten display window.
+    -initialiseGhots(): initializes each ghost's own thread (goroutine).
   
 **Update()**: checks if the game has started or not. Updates booleans for ghosts, dots and powerDots (eaten/notEaten) as well as managing key buttons, 
           checking if Pacman can move or there is a wall in between. ALso responsible for reapearing Pacman on the opposite side when out of a border.
+
 
 Draw(): draws the game layout using Ebiten, which include walls, dots, power dots, ghosts, player, score, start and end texts.
 
