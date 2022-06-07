@@ -71,8 +71,8 @@ These are a group of functions which constantly check wheter a certain boolean f
        - valueIsInSlice(): check if a certain value is already in a given slice.
        - nextIsWall(): checks if the next position Pac-Man wants to move is a wall.
        - scaleCoord(): scale maze cell coordinate to screen pixel coordinate.
-       - restart()
-       - checkError()
+       - restart(): resets various player and ghosts parameters, as well as global variables like score.
+       - checkError(): check wheter something throws an error. If so, the process is terminated.
 
 
 ### Game Loop Functions
