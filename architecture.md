@@ -25,15 +25,15 @@ Update(): checks if the game has started or not. Updates booleans for ghosts, do
 
 Draw(): draws the game layout using Ebiten, which include walls, dots, power dots, ghosts, player, score, start and end texts.
 
+### Main functions
+  readArg()
+  readFont()
+  readSprites()
+  readMaze()
+  setWindowConfig()
+  initialiseGhots()
+  
 Layout()
-readArg()
-readFont()
-readSprites()
-readMaze()
-
-setWindowConfig()
-
-initialiseGhots()
 
 makeGhostEatable(): when a powerDot is eaten, this function is called as a goroutine. It gives Pacman the ability to eat ghosts and lasts 10 seconds.
 
