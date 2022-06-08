@@ -12,6 +12,11 @@ For the graphical interface we used Ebiten, a framework for making videogames in
 The overall flow of the Pac-Man game consists of the following threads.
 
 ![pacman_architecture drawio](https://user-images.githubusercontent.com/78662124/172498190-7ef9e68b-fda0-467a-95dc-c58c9800ff6c.png)
+There is a main thread, from where everything is called. Then, we have two Ebiten based thread for the functions Update and Draw.
+Then, we use separate threads (Goroutines) for each one of the ghosts. That is why, it is multithreaded.
+
+NOTE: we also use an extra goroutine for the special Power Dot that only lasts 10 seconds.
+
 
 ## Data structures
 We defined structure types for every element in our game: 
