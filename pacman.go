@@ -370,7 +370,7 @@ func (g *Game) readSprites() {
 	checkError(err, "Load player image error")
 	playerDownImg, _, err := ebitenutil.NewImageFromFile("assets/pacman_abajo.png")
 	checkError(err, "Load player image error")
-	playerDeathImg, _, err := ebitenutil.NewImageFromFile("assets/wall.png")
+	playerDeathImg, _, err := ebitenutil.NewImageFromFile("assets/pacman_zombie.png")
 	checkError(err, "Load player image error")
 	wallImg, _, err := ebitenutil.NewImageFromFile("assets/wall.png")
 	checkError(err, "Load wall image error")
